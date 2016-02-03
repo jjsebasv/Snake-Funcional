@@ -1,0 +1,76 @@
+Elm.Main = Elm.Main || {};
+Elm.Main.make = function (_elm) {
+   "use strict";
+   _elm.Main = _elm.Main || {};
+   if (_elm.Main.values) return _elm.Main.values;
+   var _U = Elm.Native.Utils.make(_elm),
+   $Basics = Elm.Basics.make(_elm),
+   $Color = Elm.Color.make(_elm),
+   $Debug = Elm.Debug.make(_elm),
+   $Graphics$Collage = Elm.Graphics.Collage.make(_elm),
+   $Graphics$Element = Elm.Graphics.Element.make(_elm),
+   $List = Elm.List.make(_elm),
+   $Maybe = Elm.Maybe.make(_elm),
+   $Result = Elm.Result.make(_elm),
+   $Signal = Elm.Signal.make(_elm);
+   var _op = {};
+   var boxSize = 40;
+   var unit = 10;
+   var innerSize = unit * boxSize;
+   var outerSize = unit * (boxSize + 1);
+   var board = A3($Graphics$Collage.collage,
+   outerSize,
+   outerSize,
+   _U.list([A2($Graphics$Collage.filled,$Color.black,A2($Graphics$Collage.rect,outerSize,outerSize))
+           ,A2($Graphics$Collage.filled,$Color.white,A2($Graphics$Collage.rect,innerSize,innerSize))]));
+   var drawSquare = F2(function (color,position) {
+      return A2($Graphics$Collage.move,
+      {ctor: "_Tuple2",_0: $Basics.toFloat(unit * position.x),_1: $Basics.toFloat(unit * position.y)},
+      A2($Graphics$Collage.filled,color,A2($Graphics$Collage.rect,unit,unit)));
+   });
+   var drawSnake = F2(function (color,points) {    return A3($Graphics$Collage.collage,outerSize,outerSize,A2($List.map,drawSquare(color),points));});
+   var view = function (state) {
+      return $Graphics$Element.layers(_U.list([board,A2(drawSnake,$Color.blue,state.snake.head),A2(drawSnake,$Color.blue,state.snake.tail)]));
+   };
+   var initialSnake = {head: _U.list([{x: 0,y: 0},{x: 0,y: -1},{x: 0,y: -2},{x: 0,y: -3}]),tail: _U.list([])};
+   var initialFood = $Maybe.Nothing;
+   var initialDelta = {dx: 0,dy: 1};
+   var initialState = {snake: initialSnake,delta: initialDelta,food: initialFood,ticks: 0,gameOver: false};
+   var main = view(initialState);
+   var Tail = {ctor: "Tail"};
+   var Body = {ctor: "Body"};
+   var Head = {ctor: "Head"};
+   var Snake = F2(function (a,b) {    return {head: a,tail: b};});
+   var Direction = F2(function (a,b) {    return {dx: a,dy: b};});
+   var Position = F2(function (a,b) {    return {x: a,y: b};});
+   var mySquare = F2(function (color,size) {    return A2($Graphics$Collage.filled,color,$Graphics$Collage.square(size));});
+   var headSquare = A2(mySquare,$Color.blue,30);
+   var tailSquare = A2(mySquare,$Color.red,30);
+   var mySnake = A2($Graphics$Element.flow,$Graphics$Element.right,_U.list([$Graphics$Element.show(headSquare),$Graphics$Element.show(tailSquare)]));
+   var myContainer = A4($Graphics$Element.container,300,300,$Graphics$Element.middle,mySnake);
+   return _elm.Main.values = {_op: _op
+                             ,mySquare: mySquare
+                             ,headSquare: headSquare
+                             ,tailSquare: tailSquare
+                             ,mySnake: mySnake
+                             ,Position: Position
+                             ,Direction: Direction
+                             ,Snake: Snake
+                             ,Head: Head
+                             ,Body: Body
+                             ,Tail: Tail
+                             ,initialDelta: initialDelta
+                             ,initialFood: initialFood
+                             ,initialState: initialState
+                             ,initialSnake: initialSnake
+                             ,unit: unit
+                             ,boxSize: boxSize
+                             ,innerSize: innerSize
+                             ,outerSize: outerSize
+                             ,board: board
+                             ,drawSquare: drawSquare
+                             ,drawSnake: drawSnake
+                             ,view: view
+                             ,myContainer: myContainer
+                             ,main: main};
+};
