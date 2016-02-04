@@ -9,11 +9,72 @@ Elm.Main.make = function (_elm) {
    $Debug = Elm.Debug.make(_elm),
    $Graphics$Collage = Elm.Graphics.Collage.make(_elm),
    $Graphics$Element = Elm.Graphics.Element.make(_elm),
+   $Keyboard = Elm.Keyboard.make(_elm),
    $List = Elm.List.make(_elm),
    $Maybe = Elm.Maybe.make(_elm),
+   $Random = Elm.Random.make(_elm),
    $Result = Elm.Result.make(_elm),
-   $Signal = Elm.Signal.make(_elm);
+   $Set = Elm.Set.make(_elm),
+   $Signal = Elm.Signal.make(_elm),
+   $Time = Elm.Time.make(_elm);
    var _op = {};
+   var isInSnake = F2(function (snake,position) {
+      var backSet = $Set.fromList(A2($List.map,$Basics.toString,snake.tail));
+      var frontSet = $Set.fromList(A2($List.map,$Basics.toString,snake.head));
+      return A2($Set.member,$Basics.toString(position),frontSet) || A2($Set.member,$Basics.toString(position),backSet);
+   });
+   var nextPosition = F2(function (snake,_p0) {
+      var _p1 = _p0;
+      var headPosition = A2($Maybe.withDefault,{x: 0,y: 0},$List.head(snake.head));
+      return {x: headPosition.x + _p1.dx,y: headPosition.y + _p1.dy};
+   });
+   var moveSnakeForward = F3(function (snake,delta,food) {
+      var next = A2(nextPosition,snake,delta);
+      var tailFunction = function () {
+         var _p2 = food;
+         if (_p2.ctor === "Nothing") {
+               return $List.drop(1);
+            } else {
+               return _U.eq(next,_p2._0) ? $Basics.identity : $List.drop(1);
+            }
+      }();
+      return $List.isEmpty(snake.tail) ? {head: _U.list([next])
+                                         ,tail: function (_p3) {
+                                            return tailFunction($List.reverse(_p3));
+                                         }(snake.head)} : {head: A2($List._op["::"],next,snake.head),tail: tailFunction(snake.tail)};
+   });
+   var timeSignal = $Time.fps(50);
+   var PauseGame = {ctor: "PauseGame"};
+   var Ignore = {ctor: "Ignore"};
+   var NewGame = {ctor: "NewGame"};
+   var DirectionEvent = function (a) {    return {ctor: "DirectionEvent",_0: a};};
+   var directionSignal = function () {
+      var arrowsToDelta = function (_p4) {
+         var _p5 = _p4;
+         var _p7 = _p5.y;
+         var _p6 = _p5.x;
+         return _U.eq(_p6,0) && _U.eq(_p7,0) ? Ignore : !_U.eq(_p6,0) ? DirectionEvent({dx: _p6,dy: 0}) : DirectionEvent({dx: 0,dy: _p7});
+      };
+      return A2($Signal.map,arrowsToDelta,$Keyboard.arrows);
+   }();
+   var Tick = function (a) {    return {ctor: "Tick",_0: a};};
+   var velocity = 15;
+   var boardSize = 15;
+   var makeTick = function (time) {
+      var seed1 = $Random.initialSeed($Basics.round(time));
+      var _p8 = A2($Random.generate,A2($Random.$int,0 - boardSize,boardSize),seed1);
+      var x = _p8._0;
+      var seed2 = _p8._1;
+      var _p9 = A2($Random.generate,A2($Random.$int,0 - boardSize,boardSize),seed2);
+      var y = _p9._0;
+      return Tick({x: x,y: y});
+   };
+   var tickSignal = A2($Signal.map,makeTick,timeSignal);
+   var eventSignal = $Signal.mergeMany(_U.list([tickSignal,directionSignal]));
+   var collision = function (state) {
+      var next = A2(nextPosition,state.snake,state.delta);
+      return _U.cmp($Basics.abs(next.x),boardSize) > 0 || (_U.cmp($Basics.abs(next.y),boardSize) > 0 || A2(isInSnake,state.snake,next)) ? true : false;
+   };
    var boxSize = 40;
    var unit = 10;
    var innerSize = unit * boxSize;
@@ -30,47 +91,102 @@ Elm.Main.make = function (_elm) {
    });
    var drawSnake = F2(function (color,points) {    return A3($Graphics$Collage.collage,outerSize,outerSize,A2($List.map,drawSquare(color),points));});
    var view = function (state) {
-      return $Graphics$Element.layers(_U.list([board,A2(drawSnake,$Color.blue,state.snake.head),A2(drawSnake,$Color.blue,state.snake.tail)]));
+      return $Graphics$Element.layers(_U.list([board,A2(drawSnake,$Color.green,state.snake.head),A2(drawSnake,$Color.red,state.snake.tail)]));
    };
-   var initialSnake = {head: _U.list([{x: 0,y: 0},{x: 0,y: -1},{x: 0,y: -2},{x: 0,y: -3}]),tail: _U.list([])};
+   var initialSnake = {head: _U.list([{x: 0,y: -1},{x: 0,y: -2},{x: 0,y: -3}]),tail: _U.list([{x: 0,y: -4}])};
    var initialFood = $Maybe.Nothing;
    var initialDelta = {dx: 0,dy: 1};
    var initialState = {snake: initialSnake,delta: initialDelta,food: initialFood,ticks: 0,gameOver: false};
-   var main = view(initialState);
+   var step = F2(function (event,state) {
+      var _p10 = {ctor: "_Tuple2",_0: event,_1: state.gameOver};
+      _v3_2: do {
+         switch (_p10._0.ctor)
+         {case "NewGame": return initialState;
+            case "PauseGame": return initialState;
+            case "DirectionEvent": if (_p10._1 === true) {
+                    break _v3_2;
+                 } else {
+                    var _p11 = _p10._0._0;
+                    return _U.update(state,{delta: !_U.eq($Basics.abs(_p11.dx),$Basics.abs(state.delta.dx)) ? _p11 : state.delta});
+                 }
+            case "Tick": if (_p10._1 === true) {
+                    break _v3_2;
+                 } else {
+                    var _p13 = _p10._0._0;
+                    var state1 = _U.eq(A2($Basics._op["%"],state.ticks,velocity),0) ? _U.update(state,{gameOver: collision(state)}) : state;
+                    if (state1.gameOver) return state1; else {
+                          var state2 = _U.update(state1,
+                          {snake: _U.eq(A2($Basics._op["%"],state1.ticks,velocity),0) ? A3(moveSnakeForward,
+                          state1.snake,
+                          state1.delta,
+                          state1.food) : state1.snake});
+                          var state3 = _U.update(state2,
+                          {food: function () {
+                             var _p12 = state2.food;
+                             if (_p12.ctor === "Just") {
+                                   return _U.eq(A2($Basics._op["%"],state2.ticks,velocity),0) && _U.eq($List.head(state2.snake.head),
+                                   $Maybe.Just(_p12._0)) ? $Maybe.Nothing : state2.food;
+                                } else {
+                                   return A2(isInSnake,state2.snake,_p13) ? $Maybe.Nothing : $Maybe.Just(_p13);
+                                }
+                          }()});
+                          return _U.update(state3,{ticks: state3.ticks + 1});
+                       }
+                 }
+            default: if (_p10._1 === true) {
+                    break _v3_2;
+                 } else {
+                    return state;
+                 }}
+      } while (false);
+      return state;
+   });
+   var stateSignal = A3($Signal.foldp,step,initialState,eventSignal);
+   var main = A2($Signal.map,view,stateSignal);
+   var SnakeState = F5(function (a,b,c,d,e) {    return {snake: a,delta: b,food: c,ticks: d,gameOver: e};});
    var Tail = {ctor: "Tail"};
    var Body = {ctor: "Body"};
    var Head = {ctor: "Head"};
    var Snake = F2(function (a,b) {    return {head: a,tail: b};});
    var Direction = F2(function (a,b) {    return {dx: a,dy: b};});
    var Position = F2(function (a,b) {    return {x: a,y: b};});
-   var mySquare = F2(function (color,size) {    return A2($Graphics$Collage.filled,color,$Graphics$Collage.square(size));});
-   var headSquare = A2(mySquare,$Color.blue,30);
-   var tailSquare = A2(mySquare,$Color.red,30);
-   var mySnake = A2($Graphics$Element.flow,$Graphics$Element.right,_U.list([$Graphics$Element.show(headSquare),$Graphics$Element.show(tailSquare)]));
-   var myContainer = A4($Graphics$Element.container,300,300,$Graphics$Element.middle,mySnake);
    return _elm.Main.values = {_op: _op
-                             ,mySquare: mySquare
-                             ,headSquare: headSquare
-                             ,tailSquare: tailSquare
-                             ,mySnake: mySnake
                              ,Position: Position
                              ,Direction: Direction
                              ,Snake: Snake
                              ,Head: Head
                              ,Body: Body
                              ,Tail: Tail
+                             ,SnakeState: SnakeState
                              ,initialDelta: initialDelta
                              ,initialFood: initialFood
                              ,initialState: initialState
                              ,initialSnake: initialSnake
                              ,unit: unit
                              ,boxSize: boxSize
+                             ,boardSize: boardSize
+                             ,velocity: velocity
                              ,innerSize: innerSize
                              ,outerSize: outerSize
                              ,board: board
                              ,drawSquare: drawSquare
                              ,drawSnake: drawSnake
                              ,view: view
-                             ,myContainer: myContainer
+                             ,Tick: Tick
+                             ,DirectionEvent: DirectionEvent
+                             ,NewGame: NewGame
+                             ,Ignore: Ignore
+                             ,PauseGame: PauseGame
+                             ,timeSignal: timeSignal
+                             ,makeTick: makeTick
+                             ,tickSignal: tickSignal
+                             ,directionSignal: directionSignal
+                             ,eventSignal: eventSignal
+                             ,nextPosition: nextPosition
+                             ,collision: collision
+                             ,isInSnake: isInSnake
+                             ,moveSnakeForward: moveSnakeForward
+                             ,step: step
+                             ,stateSignal: stateSignal
                              ,main: main};
 };
